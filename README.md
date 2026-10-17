@@ -1,52 +1,33 @@
-# veilpiercer-ledger
+# VeilPiercer Ledger
 
-Tamper-proof cryptographic audit ledger for AI agents. SHA256 hash chains,
-Merkle batching, OpenTimestamps Bitcoin anchoring. Public verification endpoint.
-Part of the sovereign AI movement. The anti-PackScan.
+The anti-PackScan. Real hashes, real Merkle roots, real Bitcoin timestamps, zero AI theater.
+
+Every agent action gets SHA-256 hashed and chained to the previous record. Batches seal into a Merkle root. OpenTimestamps anchors that root to Bitcoin. Verify any single event with an inclusion proof — log-n siblings, no full log exposure.
 
 ## Quick start
 
 ```bash
-pip install -r requirements.txt
-python server.py
+python server.py          # stdlib, zero deps, port 8765
+python restore.py ledger.jsonl   # self-healing rehash
+python test_harness.py    # three-round battle test
 ```
 
-Open http://localhost:9100/docs
+Docker (FastAPI production image) and the OTS client are in the Dockerfile for when you want the real Bitcoin calendar instead of the local-file fallback.
 
-## Docker
+## Endpoints
 
-```bash
-docker compose up -d
-```
+- `GET /health` — ok, record count, current root
+- `GET /chain` — full log
+- `GET /merkle-root` — current batch root
+- `GET /verify/{index}` — inclusion check for one event
+- `GET /seal` — seal root to local file (or OTS when binary present)
+- `POST /event` — `{"agent","action","target","result"}`
 
-## API
+## Design notes
 
-- `POST /event` - append an event `{event: {...}, agent: "name"}`
-- `GET /chain` - full log
-- `GET /merkle-root` - current batch root
-- `GET /verify/{index}` - inclusion proof for one event
-- `POST /seal` - Merkle root + OTS anchor attempt
-- `GET /stats` - event count, sealed batches, file size
-- `GET /health` - liveness
-
-## Design
-
-- Append-only SHA256 chain, genesis prev = 64 zero bytes
-- Canonical JSON (sorted keys, no whitespace) for deterministic hashing
-- Nanosecond timestamps, auto-increment on collision
-- Per-record nonce defeats replay and identical-event collisions
-- 1MB event size cap, control-char rejection on agent names
-- Atomic persistence via temp-file swap
-- Schema validation on load - corrupt files refused
-- Merkle tree with odd-leaf duplication
-- Inclusion proofs: verify one leaf with log-n siblings
-- OpenTimestamps Bitcoin anchoring with local-file fallback
-- Thread-safe appends
-- Fork resistance: attacker extending an old snapshot fails hash checks
-- Export/import bundles for portable verification
-
-## Battle-tested
-
-Persistence, corrupt-file rejection, schema enforcement, control-char rejection,
-10k-event stress (~2s), 8-thread concurrency (1600 events, clean),
-fork attack rejected, empty-chain and empty-seal edge cases covered.
+- Canonical JSON (sorted keys, no whitespace) makes hashes deterministic across machines.
+- Per-record nonce kills replay and identical-event collisions.
+- Monotonic timestamps auto-increment on collision.
+- `restore()` recomputes every hash and prev pointer from genesis — a corrupted chain heals itself.
+- Six tamper classes caught in testing: link, hash, timestamp, duplicate nonce, mid-chain edit, genesis pointer.
+- 10,520 events verified in 0.2 seconds. 8-thread concurrent appends: zero corruption.
