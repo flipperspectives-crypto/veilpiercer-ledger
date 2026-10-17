@@ -3,67 +3,143 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>veilpiercer-ledger // verify</title>
+<title>VeilPiercer Verify</title>
 <style>
-:root{--bg:#0a0a0f;--fg:#e8e8f0;--dim:#6b6b8a;--ok:#3ddc97;--bad:#ff5c7a;--accent:#7c5cff}
-*{margin:0;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-body{background:var(--bg);color:var(--fg);min-height:100vh;padding:2rem;max-width:760px;margin:auto}
-h1{font-size:1.05rem;letter-spacing:.18em;color:var(--accent);margin-bottom:.4rem}
-.sub{color:var(--dim);font-size:.82rem;margin-bottom:1.6rem;line-height:1.5}
-textarea{width:100%;min-height:150px;background:#12121a;border:1px solid #2a2a3a;border-radius:8px;color:var(--fg);padding:1rem;font-size:.78rem;resize:vertical}
-button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:.55rem 1.3rem;font-size:.82rem;cursor:pointer;margin-top:.9rem}
-button:hover{filter:brightness(1.15)}
-#out{margin-top:1.2rem;padding:1rem;border-radius:8px;background:#12121a;border:1px solid #2a2a3a;font-size:.78rem;white-space:pre-wrap;word-break:break-all;min-height:2.4rem}
-.ok{color:var(--ok)}.bad{color:var(--bad)}.dim{color:var(--dim)}
-.row{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1rem}
-.stat{background:#12121a;border:1px solid #2a2a3a;border-radius:6px;padding:.45rem .9rem;font-size:.72rem}
-.stat b{color:var(--accent)}
-footer{margin-top:2.5rem;color:var(--dim);font-size:.7rem}
-a{color:var(--accent);text-decoration:none}
+  :root{--bg:#07070d;--panel:#10101a;--line:#1e1e2e;--text:#e8e8f0;--muted:#7a7a90;--green:#3ddc97;--red:#ff5d6c;--accent:#7aa2ff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:100vh}
+  header{border-bottom:1px solid var(--line);padding:18px 24px;display:flex;align-items:center;gap:12px}
+  header .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+  header h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase}
+  header span{color:var(--muted);font-size:12px;margin-left:auto}
+  main{max-width:860px;margin:0 auto;padding:28px 20px 60px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px}
+  label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  input{width:100%;background:#0a0a12;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:12px 14px;font:inherit;font-size:13px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .row{display:flex;gap:10px;margin-top:14px}
+  button{background:var(--accent);color:#06101f;border:0;border-radius:8px;padding:12px 22px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.04em}
+  button:hover{filter:brightness(1.1)}
+  button.secondary{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .status{margin-top:16px;padding:14px 16px;border-radius:8px;font-size:13px;display:none;white-space:pre-wrap;word-break:break-all}
+  .status.ok{display:block;background:rgba(61,220,151,.08);border:1px solid rgba(61,220,151,.35);color:var(--green)}
+  .status.bad{display:block;background:rgba(255,93,108,.08);border:1px solid rgba(255,93,108,.35);color:var(--red)}
+  .status.info{display:block;background:rgba(122,162,255,.08);border:1px solid rgba(122,162,255,.35);color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);color:var(--muted)}
+  th{color:var(--text);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:10px}
+  .hash{color:var(--text);font-size:11px}
+  footer{color:var(--muted);font-size:11px;text-align:center;padding:10px}
+  a{color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body>
-<h1>VEILPIERCER-LEDGER</h1>
-<p class="sub">paste a chain array or a full bundle JSON. verification runs entirely in your browser using the Web Crypto API. no backend, no trust, no account.</p>
-<textarea id="inp" placeholder='{"v":1,"chain":[...],"sealed":{...}}'></textarea>
-<button onclick="run()">VERIFY</button>
-<div class="row">
-<div class="stat">events: <b id="sE">0</b></div>
-<div class="stat">sealed: <b id="sS">0</b></div>
-<div class="stat">status: <b id="sT">idle</b></div>
-</div>
-<div id="out" class="dim">ready</div>
-<footer>part of the <a href="https://github.com/flipperspectives-crypto/veilpiercer-ledger">veilpiercer-ledger</a> stack. the anti-PackScan.</footer>
+<header>
+  <div class="dot" id="liveDot"></div>
+  <h1>VeilPiercer Verify</h1>
+  <span id="serverLabel">connecting...</span>
+</header>
+<main>
+  <div class="card">
+    <label>Server</label>
+    <input id="server" placeholder="http://127.0.0.1:8765" value="http://127.0.0.1:8765">
+    <div class="row">
+      <button onclick="checkHealth()">Connect</button>
+      <button class="secondary" onclick="loadChain()">Load Chain</button>
+      <button class="secondary" onclick="sealRoot()">Seal Root</button>
+    </div>
+    <div class="status info" id="healthBox"></div>
+  </div>
+  <div class="card">
+    <label>Verify Event Index</label>
+    <input id="idx" placeholder="0" value="0">
+    <div class="row"><button onclick="verifyIndex()">Verify</button></div>
+    <div class="status" id="verifyBox"></div>
+  </div>
+  <div class="card">
+    <label>Merkle Root</label>
+    <input id="rootBox" readonly placeholder="root appears after connect">
+    <div class="row"><button class="secondary" onclick="copyRoot()">Copy Root</button></div>
+  </div>
+  <div class="card">
+    <label>Recent Events</label>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>Agent</th><th>Action</th><th>Target</th><th>Hash</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<footer>anti-PackScan · real hashes · real Merkle roots · <a href="https://github.com/flipperspectives-crypto/veilpiercer-ledger" target="_blank">github</a></footer>
 <script>
-async function H(b){const x=await crypto.subtle.digest("SHA-256",b);return[...new Uint8Array(x)].map(v=>v.toString(16).padStart(2,"0")).join("")}
-function C(o){return JSON.stringify(o,Object.keys(o).sort())}
-async function run(){
- const raw=document.getElementById("inp").value.trim(),o=document.getElementById("out");
- if(!raw){o.textContent="paste a chain or bundle first";o.className="dim";return}
- let d;try{d=JSON.parse(raw)}catch(e){o.textContent="invalid JSON: "+e.message;o.className="bad";return}
- const ch=Array.isArray(d)?d:d.chain;
- document.getElementById("sE").textContent=ch&&ch.length||0;
- document.getElementById("sS").textContent=d.sealed?Object.keys(d.sealed).length:0;
- document.getElementById("sT").textContent="checking";
- if(!ch||!ch.length){o.textContent="no chain found";o.className="bad";return}
- let p="0".repeat(64),seen=new Set();
- for(let i=0;i<ch.length;i++){
-  const r=ch[i];
-  for(const k of["ts","agent","event","prev","nonce","hash"])if(r[k]==null){o.textContent="missing "+k+" @"+i;o.className="bad";return}
-  if(r.prev!==p){o.textContent="broken link @"+i;o.className="bad";return}
-  if(r.hash.length!==64||seen.has(r.hash)){o.textContent="dup/bad hash @"+i;o.className="bad";return}
-  seen.add(r.hash);
-  const b={};for(const k of Object.keys(r))if(k!=="hash")b[k]=r[k];
-  if(r.hash!==await H(new TextEncoder().encode(C(b)))){o.textContent="hash mismatch @"+i;o.className="bad";return}
-  if(i&&r.ts<=ch[i-1].ts){o.textText="timestamp rewind @"+i;o.className="bad";return}
-  p=r.hash;
- }
- let extra="";
- if(d.sealed){extra="\nsealed batches: "+Object.keys(d.sealed).length;
-  for(const rt of Object.keys(d.sealed)){const s=d.sealed[rt];extra+="\n v"+s.version+" root "+rt.slice(0,16)+"... leaves "+s.leaf_count+" ("+s.method+")"}}
- o.textContent=ch.length+" events verified, chain intact"+extra;o.className="ok";
- document.getElementById("sT").textContent="VALID";
+const $ = id => document.getElementById(id);
+async function api(path){
+  const base = $("server").value.replace(/\/$/,'');
+  const r = await fetch(base + path, {cache:'no-store'});
+  if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+  return r.json();
 }
+async function checkHealth(){
+  try{
+    const h = await api('/health);
+    $"healthBox".className = 'status ok';
+    $"healthBox".textContent = 'CONNECTED\nn=' + h.n + '\nroot=' + (h.root||'none);
+    $"rootBox".value = h.root || '';
+    $"serverLabel".textContent = 'live · ' + h.n + ' events';
+    $"liveDot".style.background = 'var(--green)';
+  }catch(e){
+    $"healthBox".className = 'status bad';
+    $"healthBox".textContent = 'UNREACHABLE\n' + e.message;
+    $"serverLabel".textContent = 'offline';
+    $"liveDot".style.background = 'var(--red)';
+  }
+}
+async function loadChain(){
+  try{
+    const chain = await api('/chain);
+    const tb = $"rows"; tb.innerHTML = '';
+    chain.slice(-20).reverse().forEach((r,i) => {
+      const tr = document.createElement('tr);
+      const idx = chain.length - 1 - i;
+      tr.innerHTML = '<td>'+idx+'</td><td>'+r.agent+'</td><td>'+r.action+'</td><td>'+r.target+'</td><td class="hash">'+(r.hash||'').slice(0,16)+'…</td>';
+      tb.appendChild(tr);
+    });
+    $"healthBox".className='status info';
+    $"healthBox".textContent = 'loaded ' + chain.length + ' events (showing last 20)';
+  }catch(e){
+    $"healthBox".className='status bad';
+    $"healthBox".textContent='LOAD FAILED\n'+e.message;
+  }
+}
+async function verifyIndex(){
+  const i = $"idx".value;
+  try{
+    const v = await api('/verify/'+i);
+    $"verifyBox".className = 'status ' + (v['valid'] ? 'ok' : 'bad);
+    $"verifyBox".textContent = (v['valid'] ? 'VALID' : 'INVALID') + '\nindex ' + v.index + '\n' + v.msg + '\nsiblings: ' + v.siblings;
+  }catch(e){
+    $"verifyBox".className='status bad';
+    $"verifyBox".textContent='ERROR\n'+e.message;
+  }
+}
+async function sealRoot(){
+  try{
+    const s = await api('/seal);
+    $"healthBox".className='status ok';
+    $"healthBox".textContent='SEALED\nroot='+s.root+'\nfile bytes='+s.bytes;
+    $"rootBox".value = s.root;
+  }catch(e){
+    $"healthBox".className='status bad';
+    $"verifyBox".textContent='SEAL FAILED\n'+e.message;
+  }
+}
+function copyRoot(){
+  navigator.clipboard.writeText($"rootBox".value);
+  $"healthBox".className='status info';
+  $"healthBox".textContent='root copied to clipboard';
+}
+checkHealth();
 </script>
 </body>
 </html>
