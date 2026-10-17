@@ -1,0 +1,8 @@
+services:
+  ledger:
+    build: .
+    ports:
+      - "9100:9100"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
