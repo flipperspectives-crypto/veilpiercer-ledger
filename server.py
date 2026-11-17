@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """VeilPiercer Ledger server — zero-dependency stdlib fallback.
 Production image uses FastAPI; this runs anywhere Python does.
-Routes: /health /chain /merkle-root /verify/{index} /seal  POST /event
+GET: /health /chain /merkle-root /verify/{index} /seal
+POST: /event /seal
 """
-import hashlib, json, os, time, threading
+import hashlib, hmac, json, os, tempfile, time, threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 GENESIS = "0" * 64
@@ -124,19 +125,46 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"index": i, "valid": ok, "msg": msg,
                              "siblings": len(L.proof(i))})
         elif p == "/seal":
-            root = L.root()
-            if root is None:
-                self._json(400, {"error": "empty chain"}); return
-            with open("/tmp/vp_seal.txt", "w") as f:
-                f.write(root + "\n" + str(time.time_ns()))
-            self._json(200, {"sealed": True, "root": root,
-                             "bytes": os.path.getsize("/tmp/vp_seal.txt")})
+            self._seal()
         else:
             self._json(404, {"error": "nope"})
 
+    def _seal(self):
+        root = L.root()
+        if root is None:
+            self._json(400, {"error": "empty chain"})
+            return
+        data = f"{root}\n{time.time_ns()}"
+        with tempfile.NamedTemporaryFile(mode="w", dir="/tmp", delete=False) as f:
+            temp_path = f.name
+            try:
+                f.write(data)
+                f.close()
+                os.replace(temp_path, "/tmp/vp_seal.txt")
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+        self._json(200, {"sealed": True, "root": root, "bytes": len(data)})
+
     def do_POST(self):
-        if self.path.split("?")[0] != "/event":
-            self._json(404, {"error": "nope"}); return
+        route = self.path.split("?")[0]
+        if route not in ("/event", "/seal"):
+            self._json(404, {"error": "nope"})
+            return
+        token = os.environ.get("VP_TOKEN")
+        authorization = self.headers.get_all("Authorization", [])
+        if token is not None and (
+            not token
+            or len(authorization) != 1
+            or not hmac.compare_digest(
+                authorization[0].encode("latin-1"), f"Bearer {token}".encode("utf-8")
+            )
+        ):
+            self._json(401, {"error": "unauthorized"})
+            return
+        if route == "/seal":
+            self._seal()
+            return
         n = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(n) or b"{}")
         rec = L.append(body.get("agent", "?"), body.get("action", "?"),
@@ -148,4 +176,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("VP_PORT", "8765"))
-    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    bind = os.environ.get("VP_BIND", "127.0.0.1")
+    HTTPServer((bind, port), Handler).serve_forever()
