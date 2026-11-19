@@ -1,3 +1,4 @@
 fastapi
 uvicorn
 pydantic
+opentimestamps-client==0.7.2
